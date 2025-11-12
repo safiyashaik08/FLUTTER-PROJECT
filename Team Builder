@@ -1,0 +1,375 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const SynergyMatchApp());
+}
+
+// --- 1. DATA MODELS ---
+
+class Student {
+  final String name;
+  final Set<String> skillsOwned;
+  final Set<String> skillsNeeded;
+  final int rating;  
+
+  Student({required this.name, required this.skillsOwned, required this.skillsNeeded, this.rating = 4});
+}
+
+class Project {
+  final String name;
+  final Set<String> requiredSkills;
+
+  Project({required this.name, required this.requiredSkills});
+}
+
+// --- 2. MOCK DATA ---
+
+final List<Student> teamPool = [
+  Student(name: 'Manohar (Data Expert)', skillsOwned: {'Data Science', 'Backend Logic', 'Python'}, skillsNeeded: {'UI Design'}, rating: 5),
+  Student(name: 'Goutham (Database Pro)', skillsOwned: {'UI Design', 'Database Mgmt', 'SQL'}, skillsNeeded: {'Flutter', 'Python'}, rating: 4),
+  Student(name: 'Alekya (Content Writer)', skillsOwned: {'Marketing', 'Copywriting'}, skillsNeeded: {'Flutter', 'Video Editing'}, rating: 3),
+  Student(name: 'Arjun (Full Stack)', skillsOwned: {'Backend Logic', 'API Integration', 'Testing'}, skillsNeeded: {'UX Research'}, rating: 5),
+  Student(name: 'Aditi Shankar(UX Designer)', skillsOwned: {'UI Design', 'UX Research', 'Figma'}, skillsNeeded: {'Backend Logic'}, rating: 4),
+  Student(name: 'Shourya (Cloud Dev)', skillsOwned: {'Cloud', 'Security', 'Database Mgmt'}, skillsNeeded: {'Frontend'}, rating: 4),
+];
+
+final Student currentUser = Student(
+  name: 'Student A (You)',
+  skillsOwned: {'Flutter', 'UI Design', 'API Integration'},
+  skillsNeeded: {'Data Science', 'Backend Logic', 'Database Mgmt'},
+);
+
+// Engineering/CS domains for project names
+final List<Project> mockProjects = [
+  Project(name: 'Artificial Intelligence (AI)', requiredSkills: {'Machine Learning', 'Python', 'Data Science', 'Statistics'}),
+  Project(name: 'Cybersecurity & Blockchain', requiredSkills: {'Security', 'Cryptography', 'Networking', 'Backend Logic'}),
+  Project(name: 'Embedded Systems Design', requiredSkills: {'C++', 'Hardware Interfacing', 'Microcontrollers', 'Testing'}),
+  Project(name: 'Mobile App Development', requiredSkills: {'Flutter', 'UX Research', 'API Integration', 'Testing'}),
+  Project(name: 'Cloud Computing Infrastructure', requiredSkills: {'AWS/Azure', 'Networking', 'Security', 'Database Mgmt'}),
+];
+
+
+// --- 3. ALGORITHMIC LOGIC ---
+
+// Calculates Skill Coverage (formerly Compatibility Index)
+double _calculateSkillCoverage(Student studentA, Student studentB) {
+  if (studentA.skillsNeeded.isEmpty) return 1.0; 
+
+  final skillsCovered = studentA.skillsNeeded.intersection(studentB.skillsOwned);
+
+  // Index is (Number of skills covered) / (Total skills needed by A)
+  return skillsCovered.length / studentA.skillsNeeded.length;
+}
+
+// --- 4. UI WIDGETS ---
+
+class SynergyMatchApp extends StatelessWidget {
+  const SynergyMatchApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Team Builder',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.indigo,
+        useMaterial3: true,
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.indigo.shade700,
+          foregroundColor: Colors.white,
+          elevation: 4,
+        ),
+      ),
+      home: const MatchmakingScreen(),
+    );
+  }
+}
+
+class SkillChipsDisplay extends StatelessWidget {
+  final Set<String> skills;
+  final Color color;
+  final Color textColor;
+
+  const SkillChipsDisplay({
+    super.key,
+    required this.skills,
+    required this.color,
+    this.textColor = Colors.white,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (skills.isEmpty) {
+      return const Text('No relevant skills listed.', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey));
+    }
+    return Wrap(
+      spacing: 6.0,
+      runSpacing: 4.0,
+      children: skills.map<Widget>((skill) => Chip(
+        label: Text(skill, style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w500)),
+        backgroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        visualDensity: VisualDensity.compact,
+      )).toList(),
+    );
+  }
+}
+
+class MatchmakingScreen extends StatefulWidget {
+  const MatchmakingScreen({super.key});
+
+  @override
+  State<MatchmakingScreen> createState() => _MatchmakingScreenState();
+}
+
+enum SortOption { coverage, rating }
+
+class _MatchmakingScreenState extends State<MatchmakingScreen> {
+  List<MapEntry<double, Student>> _rankedPool = [];
+  String _selectedProjectName = mockProjects.first.name;
+  SortOption _currentSort = SortOption.coverage;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateAndSortMatches();
+  }
+  
+  void _calculateAndSortMatches() {
+    final Project currentProject = mockProjects.firstWhere((p) => p.name == _selectedProjectName);
+    
+    // Determine the skills the project NEEDS that the current user DOESN'T OWN.
+    final Set<String> requiredSkills = currentProject.requiredSkills.difference(currentUser.skillsOwned);
+    
+    // Create a temporary "project owner" with the determined needs.
+    final Student projectOwner = Student(
+      name: currentUser.name,
+      skillsOwned: currentUser.skillsOwned,
+      skillsNeeded: requiredSkills,
+    );
+
+    _rankedPool = teamPool.map<MapEntry<double, Student>>((student) {
+      final score = _calculateSkillCoverage(projectOwner, student); 
+      return MapEntry(score, student);
+    }).toList();
+
+    _sortMatches(_currentSort);
+  }
+
+  void _sortMatches(SortOption option) {
+    setState(() {
+      _currentSort = option;
+      if (option == SortOption.coverage) { 
+        _rankedPool.sort((a, b) => b.key.compareTo(a.key)); // Sort by score descending
+      } else {
+        _rankedPool.sort((a, b) => b.value.rating.compareTo(a.value.rating)); // Sort by rating descending
+      }
+    });
+  }
+
+  Widget _buildStarRating(int rating) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (index) {
+        return Icon(
+          index < rating ? Icons.star : Icons.star_border,
+          color: Colors.amber,
+          size: 16,
+        );
+      }),
+    );
+  }
+
+  void _showSnackBarMessage(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Project currentProject = mockProjects.firstWhere((p) => p.name == _selectedProjectName);
+    final Set<String> skillsNeeded = currentProject.requiredSkills.difference(currentUser.skillsOwned);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Team Builder'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => _showSnackBarMessage(context, 'Simulated: Opening Search Filter...'),
+            tooltip: 'Search Pool',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => _showSnackBarMessage(context, 'Simulated: Opening User Settings and Preferences...'),
+            tooltip: 'Settings',
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // --- Control Panel ---
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            color: Colors.indigo.shade50,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Project Focus:', style: Theme.of(context).textTheme.titleSmall),
+                DropdownButtonFormField<String>(
+                  // Using initialValue to fix the deprecation warning
+                  initialValue: _selectedProjectName,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  items: mockProjects.map((Project project) {
+                    return DropdownMenuItem<String>(
+                      value: project.name,
+                      child: Text(project.name),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedProjectName = newValue;
+                        _calculateAndSortMatches();
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                // Skills Needed Display
+                Text('Skills to Fill:', style: Theme.of(context).textTheme.titleSmall),
+                SkillChipsDisplay(skills: skillsNeeded, color: Colors.indigo.shade400, textColor: Colors.white),
+                const SizedBox(height: 15),
+                
+                // Sort Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    const Text('Sort By:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Skill Coverage'),
+                      selected: _currentSort == SortOption.coverage,
+                      onSelected: (_) => _sortMatches(SortOption.coverage),
+                      selectedColor: Colors.indigo.shade100,
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('User Rating'),
+                      selected: _currentSort == SortOption.rating,
+                      onSelected: (_) => _sortMatches(SortOption.rating),
+                      selectedColor: Colors.indigo.shade100,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // --- Ranked Match Pool ---
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(top: 8.0),
+              itemCount: _rankedPool.length,
+              itemBuilder: (context, index) {
+                final entry = _rankedPool[index];
+                final score = entry.key;
+                final student = entry.value;
+
+                Color scoreColor = score >= 0.6 ? Colors.green.shade700 : (score >= 0.3 ? Colors.orange.shade700 : Colors.red.shade700);
+                
+                final skillsCovered = skillsNeeded.intersection(student.skillsOwned);
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header: Name, Rating, and Score
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                                _buildStarRating(student.rating),
+                              ],
+                            ),
+                            // Score Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: scoreColor,
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Text(
+                                '${(score * 100).toStringAsFixed(0)}% Coverage',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Skills Covered
+                        const Text('Skills They Bring (Overlap):', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        SkillChipsDisplay(
+                          skills: skillsCovered,
+                          color: Colors.teal.shade400,
+                          textColor: Colors.white,
+                        ),
+                        const SizedBox(height: 15),
+
+                        // Action Button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.send),
+                              label: const Text('Send Invite'),
+                              onPressed: () {
+                                _showSnackBarMessage(context, 'Invite sent to ${student.name} for $_selectedProjectName!');
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.indigo.shade700,
+                                side: BorderSide(color: Colors.indigo.shade300),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      // Floating Action Button
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showSnackBarMessage(context, 'Simulated: Opening "Create New Project" form...'),
+        icon: const Icon(Icons.add_box_outlined),
+        label: const Text('New Project'),
+        backgroundColor: Colors.indigo.shade400,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+}
