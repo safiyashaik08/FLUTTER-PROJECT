@@ -26,8 +26,8 @@ class Project {
 final List<Student> teamPool = [
   Student(name: 'Manohar (Data Expert)', skillsOwned: {'Data Science', 'Backend Logic', 'Python'}, skillsNeeded: {'UI Design'}, rating: 5),
   Student(name: 'Ananya (Database Pro)', skillsOwned: {'UI Design', 'Database Mgmt', 'SQL'}, skillsNeeded: {'Flutter', 'Python'}, rating: 4),
-  Student(name: 'Alekya (Content Writer)', skillsOwned: {'Marketing', 'Copywriting'}, skillsNeeded: {'Flutter', 'Video Editing'}, rating: 3),
-  Student(name: 'Arjun (Full Stack)', skillsOwned: {'Backend Logic', 'API Integration', 'Testing'}, skillsNeeded: {'UX Research'}, rating: 5),
+  Student(name: 'Prathusha (Content Writer)', skillsOwned: {'Marketing', 'Copywriting'}, skillsNeeded: {'Flutter', 'Video Editing'}, rating: 3),
+  Student(name: 'Sarika (Full Stack)', skillsOwned: {'Backend Logic', 'API Integration', 'Testing'}, skillsNeeded: {'UX Research'}, rating: 5),
   Student(name: 'Aditi Shankar(UX Designer)', skillsOwned: {'UI Design', 'UX Research', 'Figma'}, skillsNeeded: {'Backend Logic'}, rating: 4),
   Student(name: 'Shourya (Cloud Dev)', skillsOwned: {'Cloud', 'Security', 'Database Mgmt'}, skillsNeeded: {'Frontend'}, rating: 4),
 ];
